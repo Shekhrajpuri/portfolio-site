@@ -123,7 +123,7 @@ export default function Home() {
                 <div className="absolute inset-10 border border-blue-500/30 rounded-full animate-spin-reverse"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Image
-                    src="/images/profile-photo.jpg"
+                    src={process.env.NODE_ENV === 'production' ? '/portfolio-site/images/profile-photo.jpg' : '/images/profile-photo.jpg'}
                     width={400}
                     height={400}
                     alt="Shekhraj Puri"
