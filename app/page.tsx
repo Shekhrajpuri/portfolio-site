@@ -123,11 +123,12 @@ export default function Home() {
                 <div className="absolute inset-10 border border-blue-500/30 rounded-full animate-spin-reverse"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Image
-                    src="/images/profile-photo.png"
+                    src="/images/profile-photo.jpg"
                     width={400}
                     height={400}
                     alt="Shekhraj Puri"
                     className="rounded-full object-cover animate-float"
+                    priority
                   />
                 </div>
                 <div className="absolute -right-4 top-10 bg-white p-3 rounded-lg shadow-lg animate-float-delay-1">
