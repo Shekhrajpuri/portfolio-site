@@ -6,11 +6,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  output: 'export', // Enable static exports
+  output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
   images: {
-    unoptimized: true, // Required for static export
+    unoptimized: process.env.NODE_ENV === 'production',
   },
-  basePath: '/portfolio-site', // Add this if you're deploying to GitHub Pages
+  basePath: process.env.NODE_ENV === 'production' ? '/portfolio-site' : '',
 }
 
 export default nextConfig
