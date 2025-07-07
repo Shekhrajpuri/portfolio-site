@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced GIS Analysis Tool</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+        }
+
+        .sidebar {
+            width: 420px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(148, 163, 184, 0.1);
+            padding: 20px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: rgba(51, 65, 85, 0.3);
+            border-radius: 3px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.5);
+            border-radius: 3px;
+        }
+
+        .header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(45deg, #06b6d4, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-container {
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(51, 65, 85, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .search-button {
+            width: 100%;
+            margin-top: 12px;
+            padding: 12px;
+            background: linear-gradient(45deg, #06b6d4, #3b82f6);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .search-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4);
+        }
+
+        .search-results {
+            margin-top: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(51, 65, 85, 0.8);
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .search-result-item {
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            transition: all 0.2s ease;
+            font-size: 13px;
+        }
+
+        .search-result-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+            transform: translateX(4px);
+        }
+
+        .tool-selector {
+            width: 100%;
+            padding: 12px;
+            background: rgba(51, 65, 85, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .tool-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .tool-button {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .tool-button.primary {
+            background: linear-gradient(45deg, #059669, #10b981);
+            color: white;
+        }
+
+        .tool-button.secondary {
+            background: linear-gradient(45deg, #7c3aed, #8b5cf6);
+            color: white;
+        }
+
+        .tool-button.warning {
+            background: linear-gradient(45deg, #d97706, #f59e0b);
+            color: white;
+        }
+
+        .tool-button.danger {
+            background: linear-gradient(45deg, #dc2626, #ef4444);
+            color: white;
+        }
+
+        .tool-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-display {
+            padding: 15px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .measurements-display {
+            padding: 15px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .measurement-item {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+            font-size: 13px;
+        }
+
+        .measurement-item:last-child {
+            border-bottom: none;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .floating-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .floating-button {
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #e2e8f0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .floating-button:hover {
+            background: rgba(59, 130, 246, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .coordinates-display {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(15, 23, 42, 0.9);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .drawing-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(15, 23, 42, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        .buffer-controls {
+            margin-top: 15px;
+        }
+
+        .buffer-input {
+            width: 100%;
+            padding: 8px 12px;
+            background: rgba(51, 65, 85, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 13px;
+            outline: none;
+            margin-bottom: 8px;
+        }
+
+        .buffer-units {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .unit-button {
+            padding: 6px 12px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: rgba(51, 65, 85, 0.5);
+            color: #94a3b8;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .unit-button.active {
+            background: rgba(59, 130, 246, 0.3);
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+
+        .analysis-results {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .result-item {
+            margin-bottom: 8px;
+            padding: 8px;
+            background: rgba(30, 41, 59, 0.3);
+            border-radius: 6px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="header">
+                <h1>🌍 Advanced GIS</h1>
+                <p>Geospatial Analysis Platform</p>
+            </div>
+
+            <!-- Search Section -->
+            <div class="section">
+                <div class="section-title">🔍 Location Search</div>
+                <div class="search-container">
+                    <input type="text" class="search-input" id="searchInput" placeholder="Search for places, addresses, landmarks...">
+                    <button class="search-button" onclick="searchPlaces()">Search Location</button>
+                    <div class="search-results hidden" id="searchResults"></div>
+                </div>
+            </div>
+
+            <!-- Tool Selection -->
+            <div class="section">
+                <div class="section-title">🛠️ Analysis Tools</div>
+                <select class="tool-selector" id="toolSelector" onchange="changeTool()">
+                    <option value="buffer">🔵 Buffer Analysis</option>
+                    <option value="measure">📏 Measurement Tools</option>
+                    <option value="pointInPolygon">📍 Point in Polygon</option>
+                    <option value="intersection">🔄 Geometry Intersection</option>
+                    <option value="union">🔗 Geometry Union</option>
+                    <option value="difference">➖ Geometry Difference</option>
+                    <option value="nearest">📍 Nearest Point</option>
+                    <option value="centroid">⭕ Centroid Analysis</option>
+                </select>
+            </div>
+
+            <!-- Buffer Tool Controls -->
+            <div class="section" id="bufferControls">
+                <div class="section-title">🔵 Buffer Configuration</div>
+                <div class="buffer-controls">
+                    <input type="number" class="buffer-input" id="bufferDistance" value="1" min="0.1" step="0.1" placeholder="Distance">
+                    <div class="buffer-units">
+                        <button class="unit-button active" onclick="setBufferUnit('kilometers')">km</button>
+                        <button class="unit-button" onclick="setBufferUnit('meters')">m</button>
+                        <button class="unit-button" onclick="setBufferUnit('miles')">mi</button>
+                    </div>
+                    <button class="tool-button primary" onclick="createBuffer()">Create Buffer</button>
+                </div>
+            </div>
+
+            <!-- Measurement Tool Controls -->
+            <div class="section hidden" id="measureControls">
+                <div class="section-title">📏 Drawing Tools</div>
+                <div class="tool-buttons">
+                    <button class="tool-button primary" onclick="startDrawing('polygon')">🟩 Polygon</button>
+                    <button class="tool-button secondary" onclick="startDrawing('line')">📏 Line</button>
+                    <button class="tool-button warning" onclick="completeDrawing()">✅ Complete</button>
+                    <button class="tool-button danger" onclick="clearDrawings()">🗑️ Clear</button>
+                </div>
+            </div>
+
+            <!-- Point in Polygon Status -->
+            <div class="section hidden" id="pointInPolygonStatus">
+                <div class="section-title">📍 Point Analysis</div>
+                <div class="status-display" id="pointStatus">Click on the map to test point location</div>
+            </div>
+
+            <!-- Analysis Results -->
+            <div class="section hidden" id="analysisResults">
+                <div class="section-title">📊 Analysis Results</div>
+                <div class="analysis-results" id="resultsContainer"></div>
+            </div>
+
+            <!-- Measurements Display -->
+            <div class="section hidden" id="measurementsSection">
+                <div class="section-title">📐 Measurements</div>
+                <div class="measurements-display" id="measurementsContainer"></div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="coordinates-display" id="coordinatesDisplay">
+                Lat: 27.7172, Lng: 85.3240
+            </div>
+            <div class="floating-controls">
+                <button class="floating-button" onclick="fitToData()" title="Fit to Data">🔍</button>
+                <button class="floating-button" onclick="toggleFullscreen()" title="Toggle Fullscreen">⛶</button>
+                <button class="floating-button" onclick="exportData()" title="Export Data">💾</button>
+            </div>
+            <div class="drawing-hint hidden" id="drawingHint">
+                <div>🖊️ Drawing Mode Active</div>
+                <div style="font-size: 12px; margin-top: 8px;">Click to add points, double-click to finish</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let map;
+        let currentTool = 'buffer';
+        let bufferUnit = 'kilometers';
+        let drawingMode = null;
+        let currentDrawing = [];
+        let drawnFeatures = [];
+        let searchResults = [];
+        let measurements = [];
+        let analysisResults = [];
+        let clickedPoint = null;
+        let selectedFeatures = [];
+
+        // Map layers
+        let markersLayer, polygonsLayer, linesLayer, bufferLayer, analysisLayer;
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([27.7172, 85.3240], 8);
+            
+            // Add tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Initialize layers
+            markersLayer = L.layerGroup().addTo(map);
+            polygonsLayer = L.layerGroup().addTo(map);
+            linesLayer = L.layerGroup().addTo(map);
+            bufferLayer = L.layerGroup().addTo(map);
+            analysisLayer = L.layerGroup().addTo(map);
+
+            // Map event listeners
+            map.on('click', handleMapClick);
+            map.on('mousemove', updateCoordinates);
+            map.on('dblclick', handleDoubleClick);
+        }
+
+        // Handle map clicks
+        function handleMapClick(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            
+            updateCoordinates(e);
+
+            if (drawingMode) {
+                currentDrawing.push([lat, lng]);
+                
+                // Add temporary marker
+                L.marker([lat, lng]).addTo(markersLayer);
+                
+                // Draw temporary line
+                if (currentDrawing.length > 1) {
+                    L.polyline(currentDrawing, {
+                        color: '#f59e0b',
+                        weight: 3,
+                        dashArray: '10,5'
+                    }).addTo(linesLayer);
+                }
+                
+                return;
+            }
+
+            // Store clicked point
+            clickedPoint = [lat, lng];
+            
+            // Clear previous click marker
+            markersLayer.clearLayers();
+            
+            // Add new marker
+            L.marker([lat, lng]).addTo(markersLayer);
+
+            // Handle tool-specific actions
+            switch(currentTool) {
+                case 'buffer':
+                    handleBufferTool(lat, lng);
+                    break;
+                case 'pointInPolygon':
+                    handlePointInPolygon(lat, lng);
+                    break;
+                case 'nearest':
+                    handleNearestPoint(lat, lng);
+                    break;
+                case 'centroid':
+                    handleCentroidAnalysis(lat, lng);
+                    break;
+            }
+        }
+
+        // Handle double click to finish drawing
+        function handleDoubleClick(e) {
+            if (drawingMode) {
+                completeDrawing();
+            }
+        }
+
+        // Update coordinates display
+        function updateCoordinates(e) {
+            const lat = e.latlng.lat.toFixed(6);
+            const lng = e.latlng.lng.toFixed(6);
+            document.getElementById('coordinatesDisplay').textContent = `Lat: ${lat}, Lng: ${lng}`;
+        }
+
+        // Search places
+        async function searchPlaces() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+
+            try {
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&addressdetails=1`
+                );
+                const data = await response.json();
+                
+                displaySearchResults(data);
+            } catch (error) {
+                console.error('Search error:', error);
+                showNotification('Search failed. Please try again.', 'error');
+            }
+        }
+
+        // Display search results
+        function displaySearchResults(results) {
+            const resultsContainer = document.getElementById('searchResults');
+            resultsContainer.innerHTML = '';
+            
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div class="search-result-item">No results found</div>';
+                resultsContainer.classList.remove('hidden');
+                return;
+            }
+
+            results.forEach(result => {
+                const item = document.createElement('div');
+                item.className = 'search-result-item';
+                item.textContent = result.display_name;
+                item.onclick = () => selectPlace(result);
+                resultsContainer.appendChild(item);
+            });
+
+            resultsContainer.classList.remove('hidden');
+        }
+
+        // Select place from search results
+        function selectPlace(place) {
+            const lat = parseFloat(place.lat);
+            const lng = parseFloat(place.lon);
+            
+            // Update map view
+            map.setView([lat, lng], 14);
+            
+            // Add marker
+            markersLayer.clearLayers();
+            L.marker([lat, lng]).addTo(markersLayer);
+            
+            // Update search input
+            document.getElementById('searchInput').value = place.display_name;
+            
+            // Hide results
+            document.getElementById('searchResults').classList.add('hidden');
+            
+            // Handle bounding box if available
+            if (place.boundingbox) {
+                const bbox = place.boundingbox.map(Number);
+                const bounds = [
+                    [bbox[0], bbox[2]], // SW
+                    [bbox[1], bbox[3]]  // NE
+                ];
+                
+                // Add bounding box polygon
+                const polygon = L.polygon([
+                    [bbox[0], bbox[2]],
+                    [bbox[0], bbox[3]],
+                    [bbox[1], bbox[3]],
+                    [bbox[1], bbox[2]]
+                ], {
+                    color: '#10b981',
+                    weight: 2,
+                    fillOpacity: 0.1
+                }).addTo(polygonsLayer);
+                
+                drawnFeatures.push(polygon);
+            }
+        }
+
+        // Change active tool
+        function changeTool() {
+            currentTool = document.getElementById('toolSelector').value;
+            
+            // Hide all tool-specific controls
+            document.getElementById('bufferControls').classList.add('hidden');
+            document.getElementById('measureControls').classList.add('hidden');
+            document.getElementById('pointInPolygonStatus').classList.add('hidden');
+            document.getElementById('analysisResults').classList.add('hidden');
+            document.getElementById('measurementsSection').classList.add('hidden');
+            
+            // Show relevant controls
+            switch(currentTool) {
+                case 'buffer':
+                    document.getElementById('bufferControls').classList.remove('hidden');
+                    break;
+                case 'measure':
+                    document.getElementById('measureControls').classList.remove('hidden');
+                    document.getElementById('measurementsSection').classList.remove('hidden');
+                    break;
+                case 'pointInPolygon':
+                    document.getElementById('pointInPolygonStatus').classList.remove('hidden');
+                    break;
+                case 'intersection':
+                case 'union':
+                case 'difference':
+                case 'nearest':
+                case 'centroid':
+                    document.getElementById('analysisResults').classList.remove('hidden');
+                    break;
+            }
+            
+            // Clear drawing mode
+            stopDrawing();
+        }
+
+        // Buffer tool functions
+        function setBufferUnit(unit) {
+            bufferUnit = unit;
+            document.querySelectorAll('.unit-button').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function createBuffer() {
+            if (!clickedPoint) {
+                showNotification('Please click on the map first to create a buffer', 'warning');
+                return;
+            }
+
+            const distance = parseFloat(document.getElementById('bufferDistance').value);
+            if (isNaN(distance) || distance <= 0) {
+                showNotification('Please enter a valid distance', 'error');
+                return;
+            }
+
+            const point = turf.point([clickedPoint[1], clickedPoint[0]]);
+            const buffered = turf.buffer(point, distance, { units: bufferUnit });
+            
+            // Clear previous buffer
+            bufferLayer.clearLayers();
+            
+            // Add buffer to map
+            const coords = buffered.geometry.coordinates[0].map(coord => [coord[1], coord[0]]);
+            L.polygon(coords, {
+                color: '#3b82f6',
+                weight: 2,
+                fillOpacity: 0.2
+            }).addTo(bufferLayer);
+            
+            // Calculate buffer area
+            const area = turf.area(buffered);
+            const areaText = area > 1000000 ? 
+                `${(area / 1000000).toFixed(2)} km²` : 
+                `${(area / 10000).toFixed(2)} hectares`;
+            
+            showNotification(`Buffer created: ${distance} ${bufferUnit} (Area: ${areaText})`, 'success');
+        }
+
+        function handleBufferTool(lat, lng) {
+            // Auto-create buffer on click
+            setTimeout(() => createBuffer(), 100);
+        }
+
+        // Drawing functions
+        function startDrawing(type) {
+            drawingMode = type;
+            currentDrawing = [];
+            
+            // Clear temporary markers and lines
+            markersLayer.clearLayers();
+            linesLayer.clearLayers();
+            
+            // Show drawing hint
+            document.getElementById('drawingHint').classList.remove('hidden');
+            
+            // Disable map dragging
+            map.dragging.disable();
+        }
+
+        function stopDrawing() {
+            drawingMode = null;
+            document.getElementById('drawingHint').classList.add('hidden');
+            map.dragging.enable();
+        }
+
+        function completeDrawing() {
+            if (!drawingMode || currentDrawing.length < 2) {
+                showNotification('Not enough points to complete drawing', 'warning');
+                return;
+            }
+
+            try {
+                if (drawingMode === 'polygon' && currentDrawing.length >= 3) {
+                    // Close polygon
+                    const closedPolygon = [...currentDrawing, currentDrawing[0]];
+                    
+                    // Add to map
+                    const polygon = L.polygon(closedPolygon, {
+                        color: '#ef4444',
+                        weight: 3,
+                        fillOpacity: 0.2
+                    }).addTo(polygonsLayer);
+                    
+                    drawnFeatures.push(polygon);
+                    
+                    // Calculate area
+                    const turfPolygon = turf.polygon([closedPolygon.map(coord => [coord[1], coord[0]])]);
+                    const area = turf.area(turfPolygon);
+                    const areaText = area > 1000000 ? 
+                        `${(area / 1000000).toFixed(2)} km²` : 
+                        `${(area / 10000).toFixed(2)} hectares`;
+                    
+                    addMeasurement(`📐 Polygon Area: ${areaText}`);
+                    
+                } else if (drawingMode === 'line') {
+                    // Add to map
+                    const line = L.polyline(currentDrawing, {
+                        color: '#8b5cf6',
+                        weight: 4
+                    }).addTo(linesLayer);
+                    
+                    drawnFeatures.push(line);
+                    
+                    // Calculate length
+                    const turfLine = turf.lineString(currentDrawing.map(coord => [coord[1], coord[0]]));
+                    const length = turf.length(turfLine, { units: 'kilometers' });
+                    
+                    addMeasurement(`📏 Line Length: ${length.toFixed(2)} km`);
+                }
+                
+                // Clear drawing state
+                currentDrawing = [];
+                stopDrawing();
+                
+                // Clear temporary markers and lines
+                markersLayer.clearLayers();
+                linesLayer.clearLayers();
+                
+                showNotification('Drawing completed successfully', 'success');
+                
+            } catch (error) {
+                console.error('Drawing completion error:', error);
+                showNotification('Error completing drawing', 'error');
+            }
+        }
+
+        function clearDrawings() {
+            polygonsLayer.clearLayers();
+            linesLayer.clearLayers();
+            markersLayer.clearLayers();
+            bufferLayer.clearLayers();
+            analysisLayer.clearLayers();
+            
+            drawnFeatures = [];
+            measurements = [];
+            analysisResults = [];
+            currentDrawing = [];
+            
+            document.getElementById('measurementsContainer').innerHTML = '';
+            document.getElementById('resultsContainer').innerHTML = '';
+            
+            stopDrawing();
+            showNotification('All drawings cleared', 'info');
+        }
+
+        // Point in polygon analysis
+        function handlePointInPolygon(lat, lng) {
+            const point = turf.point([lng, lat]);
+            const statusDiv = document.getElementById('pointStatus');
+            
+            // Check against all drawn polygons
+            let isInside = false;
+            let polygonCount = 0;
+            
+            drawnFeatures.forEach(feature => {
+                if (feature instanceof L.Polygon) {
+                    polygonCount++;
+                    const latlngs = feature.getLatLngs()[0];
+                    const coords = latlngs.map(latlng => [latlng.lng, latlng.lat]);
+                    const turfPolygon = turf.polygon([coords]);
+                    
+                    if (turf.booleanPointInPolygon(point, turfPolygon)) {
+                        isInside = true;
+                    }
+                }
+            });
+            
+            if (polygonCount === 0) {
+                statusDiv.textContent = '❗ No polygons available. Draw a polygon first.';
+            } else {
+                statusDiv.textContent = isInside ? 
+                    '✅ Point is INSIDE a polygon' : 
+                    '❌ Point is OUTSIDE all polygons';
+            }
+        }
+
+        // Nearest point analysis
+        function handleNearestPoint(lat, lng) {
+            const targetPoint = turf.point([lng, lat]);
+            const points = [];
+            
+            // Collect all drawn points/markers
+            drawnFeatures.forEach(feature => {
+                if (feature instanceof L.Marker) {
+                    const latlng = feature.getLatLng();
+                    points.push(turf.point([latlng.lng, latlng.lat]));
+                }
+            });
+            
+            if (points.length === 0) {
+                showNotification('No points available for nearest point analysis', 'warning');
+                return;
+            }
+            
+            let nearest = null;
+            let minDistance = Infinity;
+            
+            points.forEach(point => {
+                const distance = turf.distance(targetPoint, point, { units: 'kilometers' });
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearest = point;
+                }
+            });
+            
+            if (nearest) {
+                // Highlight nearest point
+                const coords = nearest.geometry.coordinates;
+                L.marker([coords[1], coords[0]], {
+                    icon: L.divIcon({
+                        html: '🎯',
+                        iconSize: [20, 20],
+                        className: 'nearest-point-marker'
+                    })
+                }).addTo(analysisLayer);
+                
+                addAnalysisResult(`🎯 Nearest Point: ${minDistance.toFixed(2)} km away`);
+            }
+        }
+
+        // Centroid analysis
+        function handleCentroidAnalysis(lat, lng) {
+            const polygons = [];
+            
+            drawnFeatures.forEach(feature => {
+                if (feature instanceof L.Polygon) {
+                    const latlngs = feature.getLatLngs()[0];
+                    const coords = latlngs.map(latlng => [latlng.lng, latlng.lat]);
+                    polygons.push(turf.polygon([coords]));
+                }
+            });
+            
+            if (polygons.length === 0) {
+                showNotification('No polygons available for centroid analysis', 'warning');
+                return;
+            }
+            
+            // Clear previous centroids
+            analysisLayer.clearLayers();
+            
+            polygons.forEach((polygon, index) => {
+                const centroid = turf.centroid(polygon);
+                const coords = centroid.geometry.coordinates;
+                
+                // Add centroid marker
+                L.marker([coords[1], coords[0]], {
+                    icon: L.divIcon({
+                        html: '⭕',
+                        iconSize: [20, 20],
+                        className: 'centroid-marker'
+                    })
+                }).addTo(analysisLayer);
+                
+                addAnalysisResult(`⭕ Centroid ${index + 1}: ${coords[1].toFixed(4)}, ${coords[0].toFixed(4)}`);
+            });
+        }
+
+        // Geometry operations
+        function performIntersection() {
+            const polygons = getDrawnPolygons();
+            if (polygons.length < 2) {
+                showNotification('Need at least 2 polygons for intersection', 'warning');
+                return;
+            }
+            
+            try {
+                let result = polygons[0];
+                for (let i = 1; i < polygons.length; i++) {
+                    const intersection = turf.intersect(result, polygons[i]);
+                    if (intersection) {
+                        result = intersection;
+                    } else {
+                        showNotification('No intersection found', 'info');
+                        return;
+                    }
+                }
+                
+                // Add intersection to map
+                const coords = result.geometry.coordinates[0].map(coord => [coord[1], coord[0]]);
+                L.polygon(coords, {
+                    color: '#f59e0b',
+                    weight: 3,
+                    fillOpacity: 0.3
+                }).addTo(analysisLayer);
+                
+                const area = turf.area(result);
+                const areaText = area > 1000000 ? 
+                    `${(area / 1000000).toFixed(2)} km²` : 
+                    `${(area / 10000).toFixed(2)} hectares`;
+                
+                addAnalysisResult(`🔄 Intersection Area: ${areaText}`);
+                
+            } catch (error) {
+                console.error('Intersection error:', error);
+                showNotification('Error performing intersection', 'error');
+            }
+        }
+
+        function performUnion() {
+            const polygons = getDrawnPolygons();
+            if (polygons.length < 2) {
+                showNotification('Need at least 2 polygons for union', 'warning');
+                return;
+            }
+            
+            try {
+                let result = polygons[0];
+                for (let i = 1; i < polygons.length; i++) {
+                    result = turf.union(result, polygons[i]);
+                }
+                
+                // Add union to map
+                const coords = result.geometry.coordinates[0].map(coord => [coord[1], coord[0]]);
+                L.polygon(coords, {
+                    color: '#10b981',
+                    weight: 3,
+                    fillOpacity: 0.3
+                }).addTo(analysisLayer);
+                
+                const area = turf.area(result);
+                const areaText = area > 1000000 ? 
+                    `${(area / 1000000).toFixed(2)} km²` : 
+                    `${(area / 10000).toFixed(2)} hectares`;
+                
+                addAnalysisResult(`🔗 Union Area: ${areaText}`);
+                
+            } catch (error) {
+                console.error('Union error:', error);
+                showNotification('Error performing union', 'error');
+            }
+        }
+
+        function performDifference() {
+            const polygons = getDrawnPolygons();
+            if (polygons.length < 2) {
+                showNotification('Need at least 2 polygons for difference', 'warning');
+                return;
+            }
+            
+            try {
+                let result = polygons[0];
+                for (let i = 1; i < polygons.length; i++) {
+                    const difference = turf.difference(result, polygons[i]);
+                    if (difference) {
+                        result = difference;
+                    } else {
+                        showNotification('No difference result', 'info');
+                        return;
+                    }
+                }
+                
+                // Add difference to map
+                const coords = result.geometry.coordinates[0].map(coord => [coord[1], coord[0]]);
+                L.polygon(coords, {
+                    color: '#ef4444',
+                    weight: 3,
+                    fillOpacity: 0.3
+                }).addTo(analysisLayer);
+                
+                const area = turf.area(result);
+                const areaText = area > 1000000 ? 
+                    `${(area / 1000000).toFixed(2)} km²` : 
+                    `${(area / 10000).toFixed(2)} hectares`;
+                
+                addAnalysisResult(`➖ Difference Area: ${areaText}`);
+                
+            } catch (error) {
+                console.error('Difference error:', error);
+                showNotification('Error performing difference', 'error');
+            }
+        }
+
+        // Helper functions
+        function getDrawnPolygons() {
+            const polygons = [];
+            drawnFeatures.forEach(feature => {
+                if (feature instanceof L.Polygon) {
+                    const latlngs = feature.getLatLngs()[0];
+                    const coords = latlngs.map(latlng => [latlng.lng, latlng.lat]);
+                    polygons.push(turf.polygon([coords]));
+                }
+            });
+            return polygons;
+        }
+
+        function addMeasurement(text) {
+            measurements.push(text);
+            const container = document.getElementById('measurementsContainer');
+            const item = document.createElement('div');
+            item.className = 'measurement-item';
+            item.textContent = text;
+            container.appendChild(item);
+        }
+
+        function addAnalysisResult(text) {
+            analysisResults.push(text);
+            const container = document.getElementById('resultsContainer');
+            const item = document.createElement('div');
+            item.className = 'result-item';
+            item.textContent = text;
+            container.appendChild(item);
+        }
+
+        // Utility functions
+        function fitToData() {
+            const group = new L.featureGroup([
+                ...markersLayer.getLayers(),
+                ...polygonsLayer.getLayers(),
+                ...linesLayer.getLayers(),
+                ...bufferLayer.getLayers(),
+                ...analysisLayer.getLayers()
+            ]);
+            
+            if (group.getLayers().length > 0) {
+                map.fitBounds(group.getBounds(), { padding: [20, 20] });
+            } else {
+                map.setView([27.7172, 85.3240], 8);
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function exportData() {
+            const data = {
+                measurements: measurements,
+                analysisResults: analysisResults,
+                features: drawnFeatures.map(feature => {
+                    if (feature instanceof L.Polygon) {
+                        return {
+                            type: 'polygon',
+                            coordinates: feature.getLatLngs()[0].map(latlng => [latlng.lat, latlng.lng])
+                        };
+                    } else if (feature instanceof L.Polyline) {
+                        return {
+                            type: 'line',
+                            coordinates: feature.getLatLngs().map(latlng => [latlng.lat, latlng.lng])
+                        };
+                    } else if (feature instanceof L.Marker) {
+                        const latlng = feature.getLatLng();
+                        return {
+                            type: 'marker',
+                            coordinates: [latlng.lat, latlng.lng]
+                        };
+                    }
+                }).filter(Boolean)
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'gis_analysis_data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showNotification('Data exported successfully', 'success');
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+            `;
+            
+            switch(type) {
+                case 'success':
+                    notification.style.background = 'linear-gradient(45deg, #059669, #10b981)';
+                    break;
+                case 'error':
+                    notification.style.background = 'linear-gradient(45deg, #dc2626, #ef4444)';
+                    break;
+                case 'warning':
+                    notification.style.background = 'linear-gradient(45deg, #d97706, #f59e0b)';
+                    break;
+                default:
+                    notification.style.background = 'linear-gradient(45deg, #06b6d4, #3b82f6)';
+            }
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+            .nearest-point-marker, .centroid-marker {
+                background: none;
+                border: none;
+                font-size: 16px;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey) {
+                switch(e.key) {
+                    case 'z':
+                        e.preventDefault();
+                        if (drawnFeatures.length > 0) {
+                            const lastFeature = drawnFeatures.pop();
+                            lastFeature.remove();
+                            showNotification('Last action undone', 'info');
+                        }
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        exportData();
+                        break;
+                    case 'f':
+                        e.preventDefault();
+                        fitToData();
+                        break;
+                }
+            }
+            
+            if (e.key === 'Escape' && drawingMode) {
+                stopDrawing();
+                showNotification('Drawing cancelled', 'info');
+            }
+        });
+
+        // Add Enter key support for search
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchPlaces();
+            }
+        });
+
+        // Auto-perform geometry operations when tool is selected
+        document.getElementById('toolSelector').addEventListener('change', function() {
+            setTimeout(() => {
+                switch(currentTool) {
+                    case 'intersection':
+                        performIntersection();
+                        break;
+                    case 'union':
+                        performUnion();
+                        break;
+                    case 'difference':
+                        performDifference();
+                        break;
+                }
+            }, 100);
+        });
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            showNotification('🌍 Advanced GIS Analysis Tool Ready!', 'success');
+        });
+    </script>
+</body>
+</html>
