@@ -9,7 +9,7 @@ Visit the live website: [Portfolio Site](https://shekhrajpuri.github.io/portfoli
 ## 🚀 Deployments
 
 - GitHub Pages: [https://shekhrajpuri.github.io/portfolio-site/](https://shekhrajpuri.github.io/portfolio-site/)
-- Turf-js tools:http://localhost:3000/turf-tools
+- Turf-js tools:https://velvety-cactus-eb7c25.netlify.app/
 
 ## ✨ Features
 
